@@ -3,8 +3,8 @@
 $stalkerCredentials = [
     'host'      => 'main.light-ott.net',
     'mac'       => '00:1A:79:66:94:44',
-    'base_path' => '/c',               // from http://main.light-ott.net/c/
-    'api_file'  => 'portal.php',        // the API endpoint
+    'base_path' => '',               // from http://main.light-ott.net/c/
+    'api_file'  => 'server/load.php',        // the API endpoint
     'stb_type'  => 'MAG270'             // as per debug
 ];
 
