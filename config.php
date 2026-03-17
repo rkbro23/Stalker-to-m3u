@@ -5,7 +5,7 @@ $stalkerCredentials = [
     'mac'       => '00:1A:79:66:94:44',
     'base_path' => '/c',               // from http://main.light-ott.net/c/
     'api_file'  => 'portal.php',        // the API endpoint
-    'stb_type'  => 'MAG270'             // as seen in debug
+    'stb_type'  => 'MAG270'             // as per debug
 ];
 
 /**
@@ -82,7 +82,6 @@ function handshake($host, $mac, $forceRegenerate = false) {
         'random' => $random
     ]);
     
-    // Build API URL – now using /c/portal.php
     $url = "http://{$host}{$stalkerCredentials['base_path']}/{$stalkerCredentials['api_file']}";
     $params = [
         'type'      => 'stb',
