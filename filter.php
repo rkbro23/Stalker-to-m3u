@@ -14,11 +14,13 @@ if (empty($scriptName) || $scriptName == "filter.php") {
     $playlistUrl = str_replace($scriptName, "playlist.php", $currentUrl);
 }
 
-// Get device info for display
+// Generate device hashes for display
+$hashes = generateDeviceHashes($stalkerCredentials['mac']);
 $deviceInfo = [
     'mac' => $stalkerCredentials['mac'],
-    'sn' => substr($stalkerCredentials['sn'], 0, 8) . '...',
-    'stb_type' => $stalkerCredentials['stb_type']
+    'sn' => $hashes['sn_cut'],
+    'stb_type' => $stalkerCredentials['stb_type'],
+    'host' => $host
 ];
 ?>
 
@@ -27,14 +29,19 @@ $deviceInfo = [
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🎯 RK Stalker Filter - <?= htmlspecialchars($hostname) ?></title>
+    <title>🎯 RK STALKER FILTER - <?= htmlspecialchars($hostname) ?></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
             min-height: 100vh;
-            height: auto;
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #0a0f0f, #1a2f2f);
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0a0f0f 0%, #1a2f2f 100%);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -43,55 +50,127 @@ $deviceInfo = [
         }
 
         .container {
-            background: rgba(20, 40, 30, 0.95);
-            border-radius: 20px;
+            background: rgba(10, 25, 20, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
             padding: 30px;
             margin: 20px;
-            overflow: auto;
-            max-height: 85vh;
             width: 90%;
-            max-width: 500px;
-            text-align: center;
-            box-shadow: 0 10px 40px rgba(0, 255, 0, 0.2);
+            max-width: 550px;
+            box-shadow: 0 20px 60px rgba(0, 255, 0, 0.15);
             border: 1px solid #2a5a2a;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
 
         h2 {
             color: #7fff7f;
-            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-            margin: 0 0 10px 0;
+            text-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+            margin: 0 0 20px 0;
             text-align: center;
-            font-size: 1.8em;
+            font-size: 2em;
+            font-weight: 600;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        h2 i {
+            font-size: 1.2em;
+            color: #4aff4a;
         }
 
         .device-badge {
             background: rgba(0, 30, 0, 0.6);
             border: 1px solid #2a5a2a;
-            border-radius: 10px;
-            padding: 10px;
-            margin-bottom: 20px;
+            border-radius: 16px;
+            padding: 15px;
+            margin-bottom: 25px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
             font-size: 0.9em;
-            color: #9fff9f;
-            display: flex;
-            justify-content: space-between;
-            flex-wrap: wrap;
         }
 
         .device-badge span {
             background: #1a3a1a;
-            padding: 3px 8px;
-            border-radius: 15px;
-            margin: 2px;
+            padding: 8px 12px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #3a6a3a;
+        }
+
+        .device-badge i {
+            color: #7fff7f;
+            width: 16px;
+        }
+
+        .search-container {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 45px 14px 18px;
+            border: 2px solid #2a5a2a;
+            border-radius: 40px;
+            background: rgba(0, 30, 0, 0.6);
+            color: #e0f2e0;
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+            background: rgba(0, 40, 0, 0.8);
+        }
+
+        .search-container::after {
+            content: '🔍';
+            position: absolute;
+            right: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #7fff7f;
+            font-size: 1.2em;
+            pointer-events: none;
         }
 
         .checkbox-container {
-            max-height: 250px;
+            max-height: 300px;
             overflow-y: auto;
             padding: 15px;
             background: rgba(0, 20, 0, 0.4);
-            border-radius: 10px;
+            border-radius: 16px;
             margin-bottom: 20px;
             border: 1px solid #2a5a2a;
+            scrollbar-width: thin;
+            scrollbar-color: #2a5a2a #0a1a0a;
+        }
+
+        .checkbox-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .checkbox-container::-webkit-scrollbar-track {
+            background: #0a1a0a;
+            border-radius: 10px;
+        }
+
+        .checkbox-container::-webkit-scrollbar-thumb {
+            background: #2a5a2a;
+            border-radius: 10px;
         }
 
         .form-group {
@@ -99,8 +178,8 @@ $deviceInfo = [
             align-items: center;
             justify-content: space-between;
             margin: 8px 0;
-            padding: 8px 12px;
-            border-radius: 8px;
+            padding: 10px 15px;
+            border-radius: 12px;
             background: rgba(0, 40, 0, 0.3);
             transition: all 0.2s;
             border: 1px solid transparent;
@@ -119,6 +198,7 @@ $deviceInfo = [
             color: #c0ffc0;
             padding-left: 10px;
             cursor: pointer;
+            font-size: 0.95em;
         }
 
         .form-group input[type="checkbox"] {
@@ -128,140 +208,59 @@ $deviceInfo = [
             accent-color: #00ff00;
         }
 
+        #selectAll.form-group {
+            background: rgba(0, 60, 0, 0.5);
+            border: 1px solid #4aff4a;
+            margin-bottom: 15px;
+        }
+
         button.save-btn {
             width: 100%;
-            padding: 14px;
+            padding: 16px;
             border: none;
-            border-radius: 10px;
+            border-radius: 40px;
             font-size: 16px;
-            font-weight: 600;
+            font-weight: 700;
             cursor: pointer;
             transition: all 0.3s ease;
             background: linear-gradient(45deg, #006600, #00aa00);
             color: white;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 1.5px;
             border: 1px solid #00ff00;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
 
         button.save-btn:hover {
             background: linear-gradient(45deg, #008800, #00ff00);
-            box-shadow: 0 0 20px rgba(0, 255, 0, 0.4);
+            box-shadow: 0 10px 25px rgba(0, 255, 0, 0.4);
             transform: translateY(-2px);
         }
 
-        .popup {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(10, 30, 10, 0.98);
-            padding: 20px 30px;
-            border-radius: 15px;
-            box-shadow: 0 0 30px rgba(0, 255, 0, 0.3);
-            z-index: 1000;
-            display: none;
-            max-width: 90%;
-            text-align: center;
-            border: 2px solid #00ff00;
-        }
-
-        .popup p {
-            margin: 0 0 20px;
-            color: #b0ffb0;
+        button.save-btn i {
             font-size: 1.1em;
-        }
-
-        .popup button {
-            width: auto;
-            padding: 10px 30px;
-            margin: 0 auto;
-            display: inline-block;
-            background: linear-gradient(45deg, #006600, #00aa00);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border: 1px solid #00ff00;
-        }
-
-        .popup button:hover {
-            background: linear-gradient(45deg, #008800, #00ff00);
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.6);
-        }
-
-        .overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            display: none;
-            z-index: 999;
-            backdrop-filter: blur(3px);
-        }
-
-        .search-container {
-            margin-bottom: 20px;
-            position: relative;
-        }
-
-        .search-input {
-            width: 100%;
-            padding: 12px 40px 12px 15px;
-            border: 1px solid #2a5a2a;
-            border-radius: 8px;
-            background: rgba(0, 30, 0, 0.6);
-            color: #e0f2e0;
-            font-size: 14px;
-            box-sizing: border-box;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #00ff00;
-            box-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
-            background: rgba(0, 40, 0, 0.8);
-        }
-
-        .search-container::after {
-            content: '🔍';
-            position: absolute;
-            right: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #7fff7f;
-            font-size: 1.2em;
-        }
-
-        #loadingIndicator {
-            font-size: 18px;
-            font-weight: bold;
-            display: none;
-            color: #7fff7f;
-            margin: 20px 0;
-            text-shadow: 0 0 10px rgba(0, 255, 0, 0.5);
         }
 
         .playlist-container {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin: 20px 0;
+            margin-bottom: 15px;
         }
 
         .playlist-container input {
             flex: 1;
-            padding: 12px;
-            border: 1px solid #2a5a2a;
-            border-radius: 10px;
+            padding: 14px;
+            border: 2px solid #2a5a2a;
+            border-radius: 40px;
             background: rgba(0, 30, 0, 0.6);
             color: #e0f2e0;
             font-size: 14px;
+            font-family: monospace;
         }
 
         .playlist-container input:focus {
@@ -270,12 +269,11 @@ $deviceInfo = [
         }
 
         .btn {
-            padding: 10px;
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
             background: rgba(0, 50, 0, 0.6);
-            border: 1px solid #2a5a2a;
+            border: 2px solid #2a5a2a;
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -286,58 +284,163 @@ $deviceInfo = [
         .btn:hover {
             background: rgba(0, 100, 0, 0.8);
             border-color: #00ff00;
-            box-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
             transform: scale(1.05);
         }
 
         .btn i {
-            font-size: 16px;
+            font-size: 1.2em;
             color: #7fff7f;
         }
 
         .stats {
             margin-top: 15px;
-            font-size: 0.85em;
-            color: #6f9f6f;
+            font-size: 0.9em;
+            color: #8fbf8f;
             border-top: 1px solid #2a5a2a;
-            padding-top: 10px;
+            padding-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stats span {
+            background: #1a3a1a;
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1px solid #3a6a3a;
+        }
+
+        #loadingIndicator {
+            text-align: center;
+            padding: 30px;
+            color: #7fff7f;
+            display: none;
+        }
+
+        #loadingIndicator i {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 30, 10, 0.98);
+            backdrop-filter: blur(10px);
+            padding: 25px 35px;
+            border-radius: 20px;
+            box-shadow: 0 0 40px rgba(0, 255, 0, 0.3);
+            z-index: 1000;
+            display: none;
+            max-width: 90%;
+            text-align: center;
+            border: 2px solid #00ff00;
+            animation: popIn 0.3s ease;
+        }
+
+        @keyframes popIn {
+            from { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .popup p {
+            margin: 0 0 20px;
+            color: #b0ffb0;
+            font-size: 1.1em;
+            line-height: 1.5;
+        }
+
+        .popup button {
+            padding: 10px 40px;
+            background: linear-gradient(45deg, #006600, #00aa00);
+            color: white;
+            border: none;
+            border-radius: 40px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid #00ff00;
+        }
+
+        .popup button:hover {
+            background: linear-gradient(45deg, #008800, #00ff00);
+            box-shadow: 0 5px 15px rgba(0, 255, 0, 0.4);
+            transform: scale(1.05);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            display: none;
+            z-index: 999;
+        }
+
+        .error-message {
+            background: rgba(255, 50, 50, 0.2);
+            border: 1px solid #ff5555;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            color: #ffaaaa;
+            text-align: center;
+            display: none;
         }
 
         @media (max-width: 480px) {
             .container {
                 padding: 20px;
+                margin: 10px;
             }
 
             h2 {
-                font-size: 1.5em;
+                font-size: 1.6em;
             }
 
             .device-badge {
-                flex-direction: column;
-                gap: 5px;
+                grid-template-columns: 1fr;
             }
 
             .form-group {
                 flex-direction: column;
                 align-items: flex-start;
-                padding: 10px;
+                padding: 12px;
             }
 
             .form-group label {
                 padding-left: 0;
-                margin-top: 5px;
+                margin-top: 8px;
+            }
+
+            .stats {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
             }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>🎯 RK STALKER FILTER</h2>
+        <h2>
+            <i class="fas fa-skull"></i>
+            RK STALKER FILTER
+            <i class="fas fa-skull"></i>
+        </h2>
         
         <div class="device-badge">
             <span><i class="fas fa-wifi"></i> <?= htmlspecialchars($deviceInfo['mac']) ?></span>
-            <span><i class="fas fa-microchip"></i> SN: <?= htmlspecialchars($deviceInfo['sn']) ?></span>
+            <span><i class="fas fa-microchip"></i> SN: <?= htmlspecialchars(substr($deviceInfo['sn'], 0, 8)) ?>...</span>
             <span><i class="fas fa-tv"></i> <?= htmlspecialchars($deviceInfo['stb_type']) ?></span>
+            <span><i class="fas fa-server"></i> <?= htmlspecialchars($deviceInfo['host']) ?></span>
         </div>
         
         <div class="search-container">
@@ -345,18 +448,26 @@ $deviceInfo = [
         </div>
         
         <div id="loadingIndicator">
-            <i class="fas fa-spinner fa-spin"></i> Loading categories...
+            <i class="fas fa-spinner fa-spin"></i>
+            <div>Loading categories...</div>
+        </div>
+        
+        <div id="errorMessage" class="error-message">
+            <i class="fas fa-exclamation-triangle"></i>
+            <span id="errorText"></span>
         </div>
         
         <div class="checkbox-container" id="categoryList">
-            <div class="form-group" style="background: rgba(0, 80, 0, 0.5);">
+            <div class="form-group" id="selectAllGroup">
                 <input type="checkbox" id="selectAll" onchange="toggleSelectAll()">
                 <label for="selectAll"><strong>🔰 SELECT ALL CATEGORIES</strong></label>
             </div>
         </div>
         
         <button class="save-btn" onclick="saveM3U()">
-            <i class="fas fa-save"></i> GENERATE FILTERED PLAYLIST
+            <i class="fas fa-bolt"></i>
+            GENERATE FILTERED PLAYLIST
+            <i class="fas fa-bolt"></i>
         </button>
         
         <div class="playlist-container">
@@ -366,14 +477,16 @@ $deviceInfo = [
             </button>
         </div>
         
-        <div class="stats" id="stats">
-            <span id="selectedCount">0</span> categories selected • 
-            <span id="totalCount">0</span> total
+        <div class="stats">
+            <span><i class="fas fa-tags"></i> <span id="selectedCount">0</span> selected</span>
+            <span><i class="fas fa-list"></i> <span id="totalCount">0</span> total</span>
+            <span><i class="fas fa-check-circle" style="color: #7fff7f;"></i> RK EDITION</span>
         </div>
     </div>
 
     <div class="overlay" id="overlay"></div>
     <div class="popup" id="popup">
+        <i class="fas fa-check-circle" style="color: #7fff7f; font-size: 3em; margin-bottom: 15px;"></i>
         <p id="popupMessage"></p>
         <button onclick="closePopup()">OK</button>
     </div>
@@ -383,55 +496,81 @@ $deviceInfo = [
         let channels = [];
         let selectedCategories = new Set();
         const basePlaylistUrl = <?php echo json_encode($playlistUrl); ?>;
-        const stalkerCredentials = <?php echo json_encode($stalkerCredentials); ?>;
+        const deviceInfo = <?php echo json_encode($deviceInfo); ?>;
+
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            errorText.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
 
         async function fetchCategoriesAndChannels() {
-            const baseURL = `http://${stalkerCredentials.host}/stalker_portal/server/load.php`;
+            const loading = document.getElementById("loadingIndicator");
+            const categoryList = document.getElementById("categoryList");
             
-            document.getElementById("loadingIndicator").style.display = "block";
-            document.getElementById("categoryList").style.display = "none";
+            loading.style.display = "block";
+            categoryList.style.display = "none";
 
             try {
-                // Fetch categories
-                const categoryRes = await fetch(`feeder.php?url=${encodeURIComponent(baseURL + '?type=itv&action=get_genres&JsHttpRequest=1-xml')}`);
-                const categoryData = await categoryRes.json();
-                
-                if (!categoryRes.ok) {
-                    throw new Error(categoryData.error || 'Failed to fetch categories');
+                // First test the connection
+                const testRes = await fetch(`feeder.php?url=${encodeURIComponent('type=stb&action=handshake&JsHttpRequest=1-xml')}`);
+                if (!testRes.ok) {
+                    throw new Error('Cannot connect to portal');
                 }
 
-                categories = categoryData.js ? categoryData.js.filter(cat => cat.id !== '*') : [];
+                // Fetch categories
+                const catRes = await fetch(`feeder.php?url=${encodeURIComponent('type=itv&action=get_genres&JsHttpRequest=1-xml')}`);
+                const catData = await catRes.json();
+                
+                if (!catRes.ok) {
+                    throw new Error(catData.error || 'Failed to fetch categories');
+                }
+
+                categories = catData.js ? catData.js.filter(cat => cat.id !== '*') : [];
                 
                 // Fetch channels
-                const channelRes = await fetch(`feeder.php?url=${encodeURIComponent(baseURL + '?type=itv&action=get_all_channels&JsHttpRequest=1-xml')}`);
-                const channelData = await channelRes.json();
+                const chanRes = await fetch(`feeder.php?url=${encodeURIComponent('type=itv&action=get_all_channels&JsHttpRequest=1-xml')}`);
+                const chanData = await chanRes.json();
                 
-                if (!channelRes.ok) {
-                    throw new Error(channelData.error || 'Failed to fetch channels');
+                if (!chanRes.ok) {
+                    throw new Error(chanData.error || 'Failed to fetch channels');
                 }
 
-                channels = channelData.js?.data || [];
+                channels = chanData.js?.data || [];
                 
-                // Display categories
                 displayCategories(categories);
-                
                 document.getElementById("totalCount").textContent = categories.length;
-                showPopup(`✅ Loaded ${categories.length} categories and ${channels.length} channels`);
+                
+                showPopup(`✅ Loaded ${categories.length} categories • ${channels.length} channels`);
                 
             } catch (error) {
                 console.error("Error:", error);
+                showError(`Connection failed: ${error.message}`);
                 showPopup(`❌ Error: ${error.message}`);
             } finally {
-                document.getElementById("loadingIndicator").style.display = "none";
-                document.getElementById("categoryList").style.display = "block";
+                loading.style.display = "none";
+                categoryList.style.display = "block";
             }
         }
 
         function displayCategories(filteredCategories) {
             const categoryList = document.getElementById("categoryList");
-            const selectAllDiv = categoryList.querySelector('.form-group');
+            const selectAllDiv = document.getElementById('selectAllGroup');
             categoryList.innerHTML = '';
             categoryList.appendChild(selectAllDiv);
+
+            if (filteredCategories.length === 0) {
+                const emptyDiv = document.createElement('div');
+                emptyDiv.className = 'form-group';
+                emptyDiv.style.justifyContent = 'center';
+                emptyDiv.innerHTML = '<i class="fas fa-search"></i> No categories found';
+                categoryList.appendChild(emptyDiv);
+                return;
+            }
 
             filteredCategories.forEach(cat => {
                 const formGroup = document.createElement("div");
@@ -468,111 +607,16 @@ $deviceInfo = [
         }
 
         function filterCategories() {
-            const searchValue = document.getElementById("searchBox").value.toLowerCase();
-            const filtered = categories.filter(cat => cat.title.toLowerCase().includes(searchValue));
+            const searchValue = document.getElementById("searchBox").value.toLowerCase().trim();
+            const filtered = searchValue 
+                ? categories.filter(cat => cat.title.toLowerCase().includes(searchValue))
+                : categories;
             displayCategories(filtered);
         }
 
         function toggleSelectAll() {
             const selectAllCheckbox = document.getElementById("selectAll");
-            const isChecked = selectAllCheckbox.checked;
-            const searchValue = document.getElementById("searchBox").value.toLowerCase();
+            const searchValue = document.getElementById("searchBox").value.toLowerCase().trim();
             const filteredCategories = searchValue 
                 ? categories.filter(cat => cat.title.toLowerCase().includes(searchValue))
-                : categories;
-
-            if (isChecked) {
-                filteredCategories.forEach(cat => selectedCategories.add(cat.id));
-            } else {
-                filteredCategories.forEach(cat => selectedCategories.delete(cat.id));
-            }
-
-            document.querySelectorAll('.checkbox-container input[type="checkbox"]:not(#selectAll)').forEach(checkbox => {
-                checkbox.checked = isChecked;
-            });
-
-            updateSelectAllCheckbox();
-            updatePlaylistUrl();
-            updateSelectedCount();
-        }
-
-        function updateSelectAllCheckbox() {
-            const selectAllCheckbox = document.getElementById("selectAll");
-            const allCheckboxes = document.querySelectorAll('.checkbox-container input[type="checkbox"]:not(#selectAll)');
-            const allChecked = Array.from(allCheckboxes).every(checkbox => checkbox.checked);
-            const someChecked = Array.from(allCheckboxes).some(checkbox => checkbox.checked);
-
-            selectAllCheckbox.checked = allChecked;
-            selectAllCheckbox.indeterminate = someChecked && !allChecked;
-        }
-
-        function updatePlaylistUrl() {
-            const playlistInput = document.getElementById("playlist_url");
-            const selected = Array.from(selectedCategories);
-            if (selected.length > 0) {
-                playlistInput.value = `${basePlaylistUrl}?categories=${encodeURIComponent(selected.join(','))}`;
-            } else {
-                playlistInput.value = `${basePlaylistUrl}`;
-            }
-        }
-
-        function updateSelectedCount() {
-            document.getElementById("selectedCount").textContent = selectedCategories.size;
-        }
-
-        async function saveM3U() {
-            const selected = Array.from(selectedCategories);
-            if (!selected.length) {
-                showPopup("⚠️ Please select at least one category");
-                return;
-            }
-
-            const playlistUrlWithCategories = `${basePlaylistUrl}?categories=${encodeURIComponent(selected.join(','))}`;
-            document.getElementById("playlist_url").value = playlistUrlWithCategories;
-
-            try {
-                const response = await fetch(playlistUrlWithCategories);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                showPopup(`✅ Filtered playlist ready! Copied to clipboard?`);
-                copyToClipboard();
-            } catch (error) {
-                showPopup(`❌ Error: ${error.message}`);
-            }
-        }
-
-        function copyToClipboard() {
-            const playlistUrl = document.getElementById("playlist_url");
-            playlistUrl.select();
-            try {
-                document.execCommand('copy');
-                showPopup("📋 Playlist URL copied!");
-            } catch (err) {
-                showPopup("❌ Failed to copy. Please copy manually.");
-            }
-        }
-
-        function showPopup(message) {
-            const popup = document.getElementById("popup");
-            const popupMessage = document.getElementById("popupMessage");
-            const overlay = document.getElementById("overlay");
-            popupMessage.textContent = message;
-            popup.style.display = "block";
-            overlay.style.display = "block";
-            
-            // Auto close after 3 seconds
-            setTimeout(closePopup, 3000);
-        }
-
-        function closePopup() {
-            const popup = document.getElementById("popup");
-            const overlay = document.getElementById("overlay");
-            popup.style.display = "none";
-            overlay.style.display = "none";
-        }
-
-        window.onload = fetchCategoriesAndChannels;
-    </script>
-</body>
-</html>
+                : c
