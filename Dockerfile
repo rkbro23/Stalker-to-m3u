@@ -1,15 +1,20 @@
-FROM php:8.1-apache
+FROM php:8.2-apache
 
-RUN apt-get update && apt-get install -y \
-    libcurl4-openssl-dev \
-    pkg-config \
-    libssl-dev \
-    && docker-php-ext-install curl
+# Copy everything
+COPY . /var/www/html/
 
-COPY play.php /var/www/html/play.php
+# Enable Apache modules
+RUN a2enmod rewrite headers
 
-RUN chown -R www-data:www-data /var/www/html && chmod -R 755 /var/www/html
+# Set permissions
+RUN chown -R www-data:www-data /var/www/html \
+    && chmod -R 755 /var/www/html
 
+# Expose port
 EXPOSE 80
 
+# Create uptime trigger
+RUN echo "<?php http_response_code(200); echo 'online'; ?>" > /var/www/html/index.php
+
+# Start Apache
 CMD ["apache2-foreground"]
