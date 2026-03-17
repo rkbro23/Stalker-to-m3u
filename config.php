@@ -2,20 +2,42 @@
 // Configuration file for Stalker Portal credentials
 $stalkerCredentials = [
     'host' => 'main.light-ott.net',
-    'mac' => '00:1A:79:66:94:44',
-    'sn' => '9511a526a3131cbba83231cf0249a86a',
-    'device_id1' => 'A5C727E9313AB820B34764A3EB9A8CB9EC338BD5644D64C5D1329271730B8439',
-    'device_id2' => 'A5C727E9313AB820B34764A3EB9A8CB9EC338BD5644D64C5D1329271730B8439',
-    'signature' => 'B6FF5587BDC130BDE950A6DBEE5117CD0719441CD644C967E9F784B962A9FE5C',
-    'stb_type' => 'MAG270'
+    'mac' => '00:1A:79:66:94:44'
 ];
 
-function generateDeviceHeaders($mac, $token = '') {
-    global $stalkerCredentials;
+/**
+ * Generate dynamic device hashes from MAC (same as Python script)
+ */
+function generateDeviceHashes($mac) {
+    $mac_clean = strtoupper($mac);
     
+    // SN: first 13 chars of MD5 (uppercase)
+    $sn = strtoupper(substr(md5($mac_clean), 0, 13));
+    
+    // Device ID 1: SHA256 of MAC
+    $dev_id = strtoupper(hash('sha256', $mac_clean));
+    
+    // Device ID 2: SHA256 of MAC + 'mag250'
+    $dev_id2 = strtoupper(hash('sha256', $mac_clean . 'mag250'));
+    
+    // Signature: SHA256 of MAC + 'signature'
+    $signature = strtoupper(hash('sha256', $mac_clean . 'signature'));
+    
+    return [
+        'sn' => $sn,
+        'dev_id' => $dev_id,
+        'dev_id2' => $dev_id2,
+        'signature' => $signature
+    ];
+}
+
+/**
+ * Build headers with device spoofing (MAG250)
+ */
+function generateDeviceHeaders($mac, $token = '') {
     $headers = [
-        "User-Agent: Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG270 stbapp ver: 2 rev: 250 Safari/533.3",
-        "X-User-Agent: Model: MAG270; Link: Ethernet",
+        "User-Agent: Mozilla/5.0 (QtEmbedded; U; Linux; C) AppleWebKit/533.3 (KHTML, like Gecko) MAG250 stbapp ver: 4 rev: 250 Safari/533.3",
+        "X-User-Agent: Model: MAG250; Link: Ethernet",
         "Cookie: mac={$mac}; stb_lang=en; timezone=GMT",
         "Accept: application/json, application/javascript, text/javascript, text/html",
         "Accept-Encoding: gzip, deflate",
@@ -29,6 +51,9 @@ function generateDeviceHeaders($mac, $token = '') {
     return $headers;
 }
 
+/**
+ * Perform handshake and return token
+ */
 function handshake($host, $mac, $forceRegenerate = false) {
     static $tokenCache = null;
     
@@ -36,37 +61,36 @@ function handshake($host, $mac, $forceRegenerate = false) {
         return $tokenCache;
     }
     
-    global $stalkerCredentials;
+    $hashes = generateDeviceHashes($mac);
+    $sn = $hashes['sn'];
+    $dev_id = $hashes['dev_id'];
+    $dev_id2 = $hashes['dev_id2'];
+    $signature = $hashes['signature'];
     
-    // Build handshake URL with device signatures
     $timestamp = time();
-    $sn = $stalkerCredentials['sn'];
-    $deviceId = $stalkerCredentials['device_id1'];
-    $deviceId2 = $stalkerCredentials['device_id2'];
-    $signature = $stalkerCredentials['signature'];
-    $stbType = $stalkerCredentials['stb_type'];
+    $random = rand(100000, 999999);
     
+    // Metrics JSON (same as Python)
     $metrics = json_encode([
         'mac' => $mac,
         'sn' => $sn,
-        'model' => $stbType,
+        'model' => 'MAG250',
         'type' => 'STB',
-        'uid' => $deviceId,
-        'random' => rand(100000, 999999)
+        'uid' => $dev_id,
+        'random' => $random
     ]);
     
-    $protocol = 'http'; // Change to 'https' if needed
-$url = "{$protocol}://{$host}/stalker_portal/server/load.php";
+    $url = "http://{$host}/stalker_portal/server/load.php";
     $params = [
         'type' => 'stb',
         'action' => 'handshake',
         'token' => '',
         'JsHttpRequest' => '1-xml',
         'sn' => $sn,
-        'stb_type' => $stbType,
+        'stb_type' => 'MAG250',
         'client_type' => 'STB',
-        'device_id' => $deviceId,
-        'device_id2' => $deviceId2,
+        'device_id' => $dev_id,
+        'device_id2' => $dev_id2,
         'signature' => $signature,
         'timestamp' => $timestamp,
         'metrics' => $metrics
@@ -105,6 +129,9 @@ $url = "{$protocol}://{$host}/stalker_portal/server/load.php";
     return null;
 }
 
+/**
+ * Get token (cached)
+ */
 function generate_token($forceRegenerate = false) {
     global $stalkerCredentials;
     return handshake($stalkerCredentials['host'], $stalkerCredentials['mac'], $forceRegenerate);
