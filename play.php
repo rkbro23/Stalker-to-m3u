@@ -2,53 +2,50 @@
 require_once 'config.php';
 
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, OPTIONS");
+header("Access-Control-Allow-Methods: GET");
 set_time_limit(0);
 
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(204);
-}
-
 if (empty($_GET['id'])) {
-    exit("Error: Missing 'id' parameter");
+    exit("Error: Missing id parameter");
 }
 
 $id = preg_replace('/\.m3u8$/', '', $_GET['id']);
 $host = $stalkerCredentials['host'];
 $mac = $stalkerCredentials['mac'];
+$basePath = $stalkerCredentials['base_path'];
+$apiFile = $stalkerCredentials['api_file'];
 
-// Get fresh token
 $token = generate_token();
 if (!$token) {
-    exit("Error: Failed to authenticate with portal");
+    exit("Error: Authentication failed");
 }
 
-// Create stream link
+$hashes = generateDeviceHashes($mac);
 $timestamp = time();
-$sn = $stalkerCredentials['sn'];
-$deviceId = $stalkerCredentials['device_id1'];
-
+$random = rand(100000, 999999);
 $metrics = json_encode([
-    'mac' => $mac,
-    'sn' => $sn,
-    'model' => $stalkerCredentials['stb_type'],
-    'type' => 'STB',
-    'uid' => $deviceId,
-    'random' => rand(100000, 999999)
+    'mac'    => $mac,
+    'sn'     => $hashes['sn_cut'],
+    'model'  => $stalkerCredentials['stb_type'],
+    'type'   => 'STB',
+    'uid'    => $hashes['dev_id'],
+    'random' => $random
 ]);
 
-$url = "http://{$host}/stalker_portal/server/load.php";
+$url = "http://{$host}{$basePath}/{$apiFile}";
 $params = [
-    'type' => 'itv',
-    'action' => 'create_link',
-    'cmd' => 'ffrt http://localhost/ch/' . $id,
+    'type'      => 'itv',
+    'action'    => 'create_link',
+    'cmd'       => 'ffrt http://localhost/ch/' . $id,
     'JsHttpRequest' => '1-xml',
-    'sn' => $sn,
-    'device_id' => $deviceId,
-    'device_id2' => $stalkerCredentials['device_id2'],
-    'signature' => $stalkerCredentials['signature'],
+    'sn'        => $hashes['sn_cut'],
+    'stb_type'  => $stalkerCredentials['stb_type'],
+    'client_type' => 'STB',
+    'device_id' => $hashes['dev_id'],
+    'device_id2'=> $hashes['dev_id2'],
+    'signature' => $hashes['signature'],
     'timestamp' => $timestamp,
-    'metrics' => $metrics
+    'metrics'   => $metrics
 ];
 
 $fullUrl = $url . '?' . http_build_query($params);
@@ -68,30 +65,26 @@ $body = substr($response, $headerSize);
 curl_close($ch);
 
 if ($httpCode != 200) {
-    // Try once more with new token
+    // Retry with new token
     $token = generate_token(true);
-    if (!$token) {
-        exit("Error: Authentication failed");
+    if ($token) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $fullUrl);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, generateDeviceHeaders($mac, $token));
+        curl_setopt($ch, CURLOPT_ENCODING, 'gzip');
+        curl_setopt($ch, CURLOPT_HEADER, true);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
+        $body = substr($response, $headerSize);
+        curl_close($ch);
     }
-    
-    // Retry with new token...
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $fullUrl);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, generateDeviceHeaders($mac, $token));
-    curl_setopt($ch, CURLOPT_ENCODING, 'gzip');
-    curl_setopt($ch, CURLOPT_HEADER, true);
-    
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
-    $body = substr($response, $headerSize);
-    curl_close($ch);
-    
-    if ($httpCode != 200) {
-        exit("Error: Failed to get stream URL (HTTP $httpCode)");
-    }
+}
+
+if ($httpCode != 200) {
+    exit("Error: Failed to get stream URL (HTTP $httpCode)");
 }
 
 $data = json_decode($body, true);
@@ -101,9 +94,8 @@ if (empty($streamUrl)) {
     exit("Error: No stream URL in response");
 }
 
-// Clean up stream URL
-$streamUrl = str_replace('ffrt ', '', $streamUrl);
-$streamUrl = str_replace('ffmpeg ', '', $streamUrl);
+// Clean stream URL (remove ffrt/ffmpeg prefix)
+$streamUrl = preg_replace('/^(ffrt |ffmpeg )/', '', $streamUrl);
 $streamUrl = trim($streamUrl, '"');
 
 // Proxy the stream
@@ -125,7 +117,7 @@ $body = substr($response, $headerSize);
 $finalUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
 curl_close($ch);
 
-// Process M3U8 and fix relative paths
+// Fix relative paths in M3U8
 if (strpos($body, '#EXTM3U') !== false) {
     $baseUrl = parse_url($finalUrl, PHP_URL_SCHEME) . '://' . parse_url($finalUrl, PHP_URL_HOST);
     if ($port = parse_url($finalUrl, PHP_URL_PORT)) {
