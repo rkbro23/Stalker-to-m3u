@@ -1,12 +1,12 @@
 <?php
 // Configuration file for Stalker Portal credentials
 $stalkerCredentials = [
-    'host' => 'new.dittotvv.cc',
-    'mac' => '00:1A:79:00:29:6F',
-    'sn' => 'DB21CB2379515',
-    'device_id1' => '0FF335ABEE09FADFD6E02EA542957002B9AFAAC6DF01DD34B66A43EDC6B3CFEA',
-    'device_id2' => '0FF335ABEE09FADFD6E02EA542957002B9AFAAC6DF01DD34B66A43EDC6B3CFEA',
-    'signature' => '546E3CF35236A17083E8AA056105A48A9DEDB88698A28878790F7ABE368CB6EC',
+    'host' => 'main.light-ott.net',
+    'mac' => '00:1A:79:66:94:44',
+    'sn' => '9511a526a3131cbba83231cf0249a86a',
+    'device_id1' => 'A5C727E9313AB820B34764A3EB9A8CB9EC338BD5644D64C5D1329271730B8439',
+    'device_id2' => 'A5C727E9313AB820B34764A3EB9A8CB9EC338BD5644D64C5D1329271730B8439',
+    'signature' => 'B6FF5587BDC130BDE950A6DBEE5117CD0719441CD644C967E9F784B962A9FE5C',
     'stb_type' => 'MAG270'
 ];
 
@@ -55,7 +55,8 @@ function handshake($host, $mac, $forceRegenerate = false) {
         'random' => rand(100000, 999999)
     ]);
     
-    $url = "http://{$host}/stalker_portal/server/load.php";
+    $protocol = 'http'; // Change to 'https' if needed
+$url = "{$protocol}://{$host}/stalker_portal/server/load.php";
     $params = [
         'type' => 'stb',
         'action' => 'handshake',
