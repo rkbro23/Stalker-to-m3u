@@ -6,38 +6,40 @@ header('Access-Control-Allow-Origin: *');
 
 $host = $stalkerCredentials['host'];
 $mac = $stalkerCredentials['mac'];
-$token = generate_token();
+$basePath = $stalkerCredentials['base_path'];
+$apiFile = $stalkerCredentials['api_file'];
 
+$token = generate_token();
 if (!$token) {
     http_response_code(500);
     die("# Failed to authenticate with portal");
 }
 
-// Get channels
+$hashes = generateDeviceHashes($mac);
 $timestamp = time();
-$sn = $stalkerCredentials['sn'];
-$deviceId = $stalkerCredentials['device_id1'];
-
+$random = rand(100000, 999999);
 $metrics = json_encode([
-    'mac' => $mac,
-    'sn' => $sn,
-    'model' => $stalkerCredentials['stb_type'],
-    'type' => 'STB',
-    'uid' => $deviceId,
-    'random' => rand(100000, 999999)
+    'mac'    => $mac,
+    'sn'     => $hashes['sn_cut'],
+    'model'  => $stalkerCredentials['stb_type'],
+    'type'   => 'STB',
+    'uid'    => $hashes['dev_id'],
+    'random' => $random
 ]);
 
-$url = "http://{$host}/stalker_portal/server/load.php";
+$url = "http://{$host}{$basePath}/{$apiFile}";
 $params = [
-    'type' => 'itv',
-    'action' => 'get_all_channels',
+    'type'      => 'itv',
+    'action'    => 'get_all_channels',
     'JsHttpRequest' => '1-xml',
-    'sn' => $sn,
-    'device_id' => $deviceId,
-    'device_id2' => $stalkerCredentials['device_id2'],
-    'signature' => $stalkerCredentials['signature'],
+    'sn'        => $hashes['sn_cut'],
+    'stb_type'  => $stalkerCredentials['stb_type'],
+    'client_type' => 'STB',
+    'device_id' => $hashes['dev_id'],
+    'device_id2'=> $hashes['dev_id2'],
+    'signature' => $hashes['signature'],
     'timestamp' => $timestamp,
-    'metrics' => $metrics
+    'metrics'   => $metrics
 ];
 
 $fullUrl = $url . '?' . http_build_query($params);
@@ -58,7 +60,7 @@ curl_close($ch);
 
 if ($httpCode != 200) {
     http_response_code(500);
-    die("# Failed to fetch channels: HTTP $httpCode");
+    die("# Failed to fetch channels: HTTP $httpCode\n$body");
 }
 
 $data = json_decode($body, true);
@@ -68,11 +70,36 @@ if (empty($channels)) {
     die("# No channels found");
 }
 
+// Get categories for group titles
+$catParams = $params;
+$catParams['type'] = 'itv';
+$catParams['action'] = 'get_genres';
+$catUrl = $url . '?' . http_build_query($catParams);
+
+$ch = curl_init();
+curl_setopt($ch, CURLOPT_URL, $catUrl);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_HTTPHEADER, generateDeviceHeaders($mac, $token));
+curl_setopt($ch, CURLOPT_ENCODING, 'gzip');
+$catResponse = curl_exec($ch);
+curl_close($ch);
+
+$categoryMap = [];
+if ($catResponse) {
+    $catData = json_decode($catResponse, true);
+    if (isset($catData['js']) && is_array($catData['js'])) {
+        foreach ($catData['js'] as $cat) {
+            if ($cat['id'] !== '*') {
+                $categoryMap[$cat['id']] = $cat['title'] ?? 'Unknown';
+            }
+        }
+    }
+}
+
 // Build base URL for play.php
 $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
 $baseUrl = $protocol . $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) . '/play.php?id=';
 
-// Generate M3U
 echo "#EXTM3U\n";
 
 foreach ($channels as $channel) {
@@ -87,12 +114,15 @@ foreach ($channels as $channel) {
     
     $name = $channel['name'] ?? 'Unknown';
     $logo = $channel['logo'] ?? '';
-    $genre = $channel['tv_genre_id'] ?? '0';
+    $catId = $channel['tv_genre_id'] ?? '';
+    $group = $categoryMap[$catId] ?? 'Uncategorized';
     
-    // Get category name (simplified - you can fetch genres too)
-    $group = "Category $genre";
+    // Build full logo URL
+    if ($logo && !preg_match('/^https?:\/\//', $logo)) {
+        $logo = "http://$host{$basePath}/misc/logos/320/$logo";
+    }
     
-    echo "#EXTINF:-1 tvg-id=\"$id\" tvg-name=\"$name\" tvg-logo=\"http://$host/stalker_portal/misc/logos/320/$logo\" group-title=\"$group\",$name\n";
+    echo "#EXTINF:-1 tvg-id=\"$id\" tvg-name=\"$name\" tvg-logo=\"$logo\" group-title=\"$group\",$name\n";
     echo $baseUrl . $id . ".m3u8\n";
 }
 ?>
