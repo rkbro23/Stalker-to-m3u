@@ -2,81 +2,77 @@
 require_once 'config.php';
 
 echo "🔍 RK Debug Tool\n\n";
+echo "Host: {$stalkerCredentials['host']}\n";
+echo "MAC: {$stalkerCredentials['mac']}\n";
 
-$host = $stalkerCredentials['host'];
-$mac = $stalkerCredentials['mac'];
+$hashes = generateDeviceHashes($stalkerCredentials['mac']);
+echo "SN (cut): {$hashes['sn_cut']}\n";
+echo "Device ID: " . substr($hashes['dev_id'], 0, 16) . "...\n\n";
 
-echo "Host: $host\n";
-echo "MAC: $mac\n";
-echo "SN: {$stalkerCredentials['sn']}\n\n";
-
-// Test 1: Basic connection
+// Test 1: Check portal reachability
 echo "Test 1: Checking if portal is reachable...\n";
-$ch = curl_init("http://$host/stalker_portal/c/");
+$ch = curl_init("http://{$stalkerCredentials['host']}{$stalkerCredentials['base_path']}/");
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 curl_setopt($ch, CURLOPT_TIMEOUT, 10);
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
-
 echo "HTTP Code: $httpCode\n";
 echo "Response length: " . strlen($response) . " chars\n\n";
 
-// Test 2: Try handshake manually
+// Test 2: Handshake
 echo "Test 2: Attempting handshake...\n";
-$token = handshake($host, $mac, true);
+$token = handshake($stalkerCredentials['host'], $stalkerCredentials['mac'], true);
 if ($token) {
     echo "✅ Token received: " . substr($token, 0, 20) . "...\n";
 } else {
     echo "❌ Handshake failed\n";
     
-    // Try with curl directly to see raw response
-    echo "\nRaw handshake attempt:\n";
-    
+    // Show raw handshake attempt
+    $hashes = generateDeviceHashes($stalkerCredentials['mac']);
     $timestamp = time();
-    $sn = $stalkerCredentials['sn'];
-    $deviceId = $stalkerCredentials['device_id1'];
-    
+    $random = rand(100000, 999999);
     $metrics = json_encode([
-        'mac' => $mac,
-        'sn' => $sn,
-        'model' => $stalkerCredentials['stb_type'],
-        'type' => 'STB',
-        'uid' => $deviceId,
-        'random' => rand(100000, 999999)
+        'mac'    => $stalkerCredentials['mac'],
+        'sn'     => $hashes['sn_cut'],
+        'model'  => $stalkerCredentials['stb_type'],
+        'type'   => 'STB',
+        'uid'    => $hashes['dev_id'],
+        'random' => $random
     ]);
     
-    $url = "http://{$host}/stalker_portal/server/load.php";
+    $url = "http://{$stalkerCredentials['host']}{$stalkerCredentials['base_path']}/{$stalkerCredentials['api_file']}";
     $params = [
-        'type' => 'stb',
-        'action' => 'handshake',
-        'token' => '',
+        'type'      => 'stb',
+        'action'    => 'handshake',
+        'token'     => '',
         'JsHttpRequest' => '1-xml',
-        'sn' => $sn,
-        'stb_type' => $stalkerCredentials['stb_type'],
-        'device_id' => $deviceId,
-        'device_id2' => $stalkerCredentials['device_id2'],
-        'signature' => $stalkerCredentials['signature'],
+        'sn'        => $hashes['sn_cut'],
+        'stb_type'  => $stalkerCredentials['stb_type'],
+        'client_type' => 'STB',
+        'device_id' => $hashes['dev_id'],
+        'device_id2'=> $hashes['dev_id2'],
+        'signature' => $hashes['signature'],
         'timestamp' => $timestamp,
-        'metrics' => $metrics
+        'metrics'   => $metrics
     ];
     
     $fullUrl = $url . '?' . http_build_query($params);
-    echo "URL: $fullUrl\n\n";
+    echo "\nRaw handshake attempt:\nURL: $fullUrl\n\n";
     
     $ch = curl_init();
     curl_setopt($ch, CURLOPT_URL, $fullUrl);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, generateDeviceHeaders($mac));
+    curl_setopt($ch, CURLOPT_HTTPHEADER, generateDeviceHeaders($stalkerCredentials['mac']));
     curl_setopt($ch, CURLOPT_HEADER, true);
+    curl_setopt($ch, CURLOPT_ENCODING, 'gzip');
     
     $response = curl_exec($ch);
     $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $headerSize = curl_getinfo($ch, CURLINFO_HEADER_SIZE);
     $headers = substr($response, 0, $headerSize);
     $body = substr($response, $headerSize);
-    
     echo "HTTP Code: $httpCode\n";
     echo "Headers:\n$headers\n";
     echo "Body:\n$body\n";
