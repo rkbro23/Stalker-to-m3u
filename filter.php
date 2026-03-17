@@ -18,8 +18,8 @@ if (empty($scriptName) || $scriptName == "filter.php") {
 $hashes = generateDeviceHashes($stalkerCredentials['mac']);
 $deviceInfo = [
     'mac' => $stalkerCredentials['mac'],
-    'sn' => $hashes['sn_cut'],
-    'stb_type' => $stalkerCredentials['stb_type'],
+    'sn' => $hashes['sn'],
+    'stb_type' => 'MAG250',
     'host' => $host
 ];
 ?>
@@ -32,12 +32,421 @@ $deviceInfo = [
     <title>🎯 RK STALKER FILTER - <?= htmlspecialchars($hostname) ?></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <style>
-        /* (keep all your beautiful CSS from before) */
+        :root {
+            --bg-primary: #0a0f0f;
+            --bg-secondary: #1a2f2f;
+            --text-primary: #e0f2e0;
+            --text-secondary: #a0d0a0;
+            --accent: #00ff00;
+            --accent-dark: #006600;
+            --card-bg: #1a3a1a;
+            --card-shadow: 0 10px 40px rgba(0, 255, 0, 0.2);
+            --border-color: #2a5a2a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0a0f0f, #1a2f2f);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+            color: var(--text-primary);
+        }
+
+        .container {
+            background: rgba(20, 40, 30, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 24px;
+            padding: 30px;
+            margin: 20px;
+            width: 90%;
+            max-width: 550px;
+            box-shadow: 0 20px 60px rgba(0, 255, 0, 0.15);
+            border: 1px solid var(--border-color);
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            color: #7fff7f;
+            text-shadow: 0 0 15px rgba(0, 255, 0, 0.3);
+            margin: 0 0 20px 0;
+            text-align: center;
+            font-size: 2em;
+            font-weight: 600;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        h2 i {
+            font-size: 1.2em;
+            color: #4aff4a;
+        }
+
+        .device-badge {
+            background: rgba(0, 30, 0, 0.6);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 15px;
+            margin-bottom: 25px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 10px;
+            font-size: 0.9em;
+        }
+
+        .device-badge span {
+            background: #1a3a1a;
+            padding: 8px 12px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #3a6a3a;
+        }
+
+        .device-badge i {
+            color: #7fff7f;
+            width: 16px;
+        }
+
+        .search-container {
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 45px 14px 18px;
+            border: 2px solid var(--border-color);
+            border-radius: 40px;
+            background: rgba(0, 30, 0, 0.6);
+            color: var(--text-primary);
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.2);
+            background: rgba(0, 40, 0, 0.8);
+        }
+
+        .search-container::after {
+            content: '🔍';
+            position: absolute;
+            right: 18px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #7fff7f;
+            font-size: 1.2em;
+            pointer-events: none;
+        }
+
+        .checkbox-container {
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 15px;
+            background: rgba(0, 20, 0, 0.4);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+            scrollbar-width: thin;
+            scrollbar-color: #2a5a2a #0a1a0a;
+        }
+
+        .checkbox-container::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .checkbox-container::-webkit-scrollbar-track {
+            background: #0a1a0a;
+            border-radius: 10px;
+        }
+
+        .checkbox-container::-webkit-scrollbar-thumb {
+            background: #2a5a2a;
+            border-radius: 10px;
+        }
+
+        .form-group {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 10px 15px;
+            border-radius: 12px;
+            background: rgba(0, 40, 0, 0.3);
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .form-group:hover {
+            background: rgba(0, 80, 0, 0.4);
+            border-color: #4aff4a;
+            transform: translateX(5px);
+        }
+
+        .form-group label {
+            flex: 1;
+            text-align: left;
+            font-weight: 500;
+            color: #c0ffc0;
+            padding-left: 10px;
+            cursor: pointer;
+            font-size: 0.95em;
+        }
+
+        .form-group input[type="checkbox"] {
+            transform: scale(1.2);
+            cursor: pointer;
+            margin-right: 10px;
+            accent-color: var(--accent);
+        }
+
+        #selectAllGroup {
+            background: rgba(0, 60, 0, 0.5);
+            border: 1px solid #4aff4a;
+            margin-bottom: 15px;
+        }
+
+        button.save-btn {
+            width: 100%;
+            padding: 16px;
+            border: none;
+            border-radius: 40px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(45deg, #006600, #00aa00);
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            border: 1px solid var(--accent);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        button.save-btn:hover {
+            background: linear-gradient(45deg, #008800, #00ff00);
+            box-shadow: 0 10px 25px rgba(0, 255, 0, 0.4);
+            transform: translateY(-2px);
+        }
+
+        button.save-btn i {
+            font-size: 1.1em;
+        }
+
+        .playlist-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .playlist-container input {
+            flex: 1;
+            padding: 14px;
+            border: 2px solid var(--border-color);
+            border-radius: 40px;
+            background: rgba(0, 30, 0, 0.6);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-family: monospace;
+        }
+
+        .playlist-container input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: rgba(0, 50, 0, 0.6);
+            border: 2px solid var(--border-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: rgba(0, 100, 0, 0.8);
+            border-color: var(--accent);
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+            transform: scale(1.05);
+        }
+
+        .btn i {
+            font-size: 1.2em;
+            color: #7fff7f;
+        }
+
+        .stats {
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #8fbf8f;
+            border-top: 1px solid var(--border-color);
+            padding-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .stats span {
+            background: #1a3a1a;
+            padding: 5px 12px;
+            border-radius: 20px;
+            border: 1px solid #3a6a3a;
+        }
+
+        #loadingIndicator {
+            text-align: center;
+            padding: 30px;
+            color: #7fff7f;
+            display: none;
+        }
+
+        #loadingIndicator i {
+            font-size: 2em;
+            margin-bottom: 10px;
+        }
+
+        .error-message {
+            background: rgba(255, 50, 50, 0.2);
+            border: 1px solid #ff5555;
+            border-radius: 12px;
+            padding: 15px;
+            margin: 10px 0;
+            color: #ffaaaa;
+            text-align: center;
+            display: none;
+        }
+
+        .popup {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(10, 30, 10, 0.98);
+            backdrop-filter: blur(10px);
+            padding: 25px 35px;
+            border-radius: 20px;
+            box-shadow: 0 0 40px rgba(0, 255, 0, 0.3);
+            z-index: 1000;
+            display: none;
+            max-width: 90%;
+            text-align: center;
+            border: 2px solid var(--accent);
+            animation: popIn 0.3s ease;
+        }
+
+        @keyframes popIn {
+            from { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .popup p {
+            margin: 0 0 20px;
+            color: #b0ffb0;
+            font-size: 1.1em;
+            line-height: 1.5;
+        }
+
+        .popup button {
+            padding: 10px 40px;
+            background: linear-gradient(45deg, #006600, #00aa00);
+            color: white;
+            border: none;
+            border-radius: 40px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 1px solid var(--accent);
+        }
+
+        .popup button:hover {
+            background: linear-gradient(45deg, #008800, #00ff00);
+            box-shadow: 0 5px 15px rgba(0, 255, 0, 0.4);
+            transform: scale(1.05);
+        }
+
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px);
+            display: none;
+            z-index: 999;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 20px;
+                margin: 10px;
+            }
+
+            h2 {
+                font-size: 1.6em;
+            }
+
+            .device-badge {
+                grid-template-columns: 1fr;
+            }
+
+            .form-group {
+                flex-direction: column;
+                align-items: flex-start;
+                padding: 12px;
+            }
+
+            .form-group label {
+                padding-left: 0;
+                margin-top: 8px;
+            }
+
+            .stats {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2><i class="fas fa-skull"></i> RK STALKER FILTER <i class="fas fa-skull"></i></h2>
+        <h2>
+            <i class="fas fa-skull"></i>
+            RK STALKER FILTER
+            <i class="fas fa-skull"></i>
+        </h2>
         
         <div class="device-badge">
             <span><i class="fas fa-wifi"></i> <?= htmlspecialchars($deviceInfo['mac']) ?></span>
@@ -52,7 +461,7 @@ $deviceInfo = [
         
         <div id="loadingIndicator">
             <i class="fas fa-spinner fa-spin"></i>
-            <div>Loading categories...</div>
+            <div>Loading channels & extracting categories...</div>
         </div>
         
         <div id="errorMessage" class="error-message">
@@ -68,7 +477,9 @@ $deviceInfo = [
         </div>
         
         <button class="save-btn" onclick="saveM3U()">
-            <i class="fas fa-bolt"></i> GENERATE FILTERED PLAYLIST <i class="fas fa-bolt"></i>
+            <i class="fas fa-bolt"></i>
+            GENERATE FILTERED PLAYLIST
+            <i class="fas fa-bolt"></i>
         </button>
         
         <div class="playlist-container">
@@ -81,7 +492,7 @@ $deviceInfo = [
         <div class="stats">
             <span><i class="fas fa-tags"></i> <span id="selectedCount">0</span> selected</span>
             <span><i class="fas fa-list"></i> <span id="totalCount">0</span> total</span>
-            <span><i class="fas fa-check-circle"></i> RK EDITION</span>
+            <span><i class="fas fa-check-circle" style="color: #7fff7f;"></i> RK EDITION</span>
         </div>
     </div>
 
@@ -117,23 +528,7 @@ $deviceInfo = [
             categoryList.style.display = "none";
 
             try {
-                // ✅ FIXED: Use "get_categories" instead of "get_genres"
-                const catRes = await fetch(`feeder.php?url=${encodeURIComponent('type=itv&action=get_categories&JsHttpRequest=1-xml')}`);
-                const catData = await catRes.json();
-                
-                if (!catRes.ok) {
-                    throw new Error(catData.error || 'Failed to fetch categories');
-                }
-
-                // The response might be under "js" key or directly an array
-                categories = catData.js || catData;
-                if (!Array.isArray(categories)) {
-                    categories = [];
-                }
-                // Filter out any with id '*'
-                categories = categories.filter(cat => cat.id !== '*');
-                
-                // Fetch channels
+                // ✅ ONLY fetch channels - categories will be extracted from them
                 const chanRes = await fetch(`feeder.php?url=${encodeURIComponent('type=itv&action=get_all_channels&JsHttpRequest=1-xml')}`);
                 const chanData = await chanRes.json();
                 
@@ -143,10 +538,34 @@ $deviceInfo = [
 
                 channels = chanData.js?.data || [];
                 
+                // ✅ Extract unique categories from channels
+                const categoryMap = new Map();
+                channels.forEach(channel => {
+                    const catId = channel.tv_genre_id;
+                    // Use tv_genre_title if available, otherwise create a name from ID
+                    let catName = channel.tv_genre_title;
+                    if (!catName || catName === '') {
+                        // Try to get from command or name as fallback
+                        catName = `Category ${catId}`;
+                    }
+                    
+                    if (catId && !categoryMap.has(catId)) {
+                        categoryMap.set(catId, {
+                            id: catId,
+                            title: catName
+                        });
+                    }
+                });
+                
+                // Convert map to array and sort by title
+                categories = Array.from(categoryMap.values()).sort((a, b) => 
+                    a.title.localeCompare(b.title)
+                );
+                
                 displayCategories(categories);
                 document.getElementById("totalCount").textContent = categories.length;
                 
-                showPopup(`✅ Loaded ${categories.length} categories • ${channels.length} channels`);
+                showPopup(`✅ Loaded ${categories.length} categories from ${channels.length} channels`);
                 
             } catch (error) {
                 console.error("Error:", error);
@@ -199,122 +618,4 @@ $deviceInfo = [
 
                 formGroup.appendChild(checkbox);
                 formGroup.appendChild(label);
-                categoryList.appendChild(formGroup);
-            });
-
-            updateSelectAllCheckbox();
-            updatePlaylistUrl();
-            updateSelectedCount();
-        }
-
-        function filterCategories() {
-            const searchValue = document.getElementById("searchBox").value.toLowerCase().trim();
-            const filtered = searchValue 
-                ? categories.filter(cat => cat.title.toLowerCase().includes(searchValue))
-                : categories;
-            displayCategories(filtered);
-        }
-
-        function toggleSelectAll() {
-            const selectAllCheckbox = document.getElementById("selectAll");
-            const searchValue = document.getElementById("searchBox").value.toLowerCase().trim();
-            const filteredCategories = searchValue 
-                ? categories.filter(cat => cat.title.toLowerCase().includes(searchValue))
-                : categories;
-
-            if (selectAllCheckbox.checked) {
-                filteredCategories.forEach(cat => selectedCategories.add(cat.id));
-            } else {
-                filteredCategories.forEach(cat => selectedCategories.delete(cat.id));
-            }
-
-            document.querySelectorAll('.checkbox-container input[type="checkbox"]:not(#selectAll)').forEach(checkbox => {
-                checkbox.checked = selectAllCheckbox.checked;
-            });
-
-            updateSelectAllCheckbox();
-            updatePlaylistUrl();
-            updateSelectedCount();
-        }
-
-        function updateSelectAllCheckbox() {
-            const selectAll = document.getElementById("selectAll");
-            const checkboxes = document.querySelectorAll('.checkbox-container input[type="checkbox"]:not(#selectAll)');
-            const allChecked = Array.from(checkboxes).every(cb => cb.checked);
-            const someChecked = Array.from(checkboxes).some(cb => cb.checked);
-
-            selectAll.checked = allChecked;
-            selectAll.indeterminate = someChecked && !allChecked;
-        }
-
-        function updatePlaylistUrl() {
-            const input = document.getElementById("playlist_url");
-            const selected = Array.from(selectedCategories);
-            if (selected.length > 0) {
-                input.value = `${basePlaylistUrl}?categories=${encodeURIComponent(selected.join(','))}`;
-            } else {
-                input.value = basePlaylistUrl;
-            }
-        }
-
-        function updateSelectedCount() {
-            document.getElementById("selectedCount").textContent = selectedCategories.size;
-        }
-
-        async function saveM3U() {
-            const selected = Array.from(selectedCategories);
-            if (!selected.length) {
-                showPopup("⚠️ Please select at least one category");
-                return;
-            }
-
-            const url = selected.length > 0 
-                ? `${basePlaylistUrl}?categories=${encodeURIComponent(selected.join(','))}`
-                : basePlaylistUrl;
-            
-            document.getElementById("playlist_url").value = url;
-
-            try {
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`HTTP ${response.status}`);
-                }
-                showPopup(`✅ Playlist generated with ${selected.length} categories`);
-                copyToClipboard();
-            } catch (error) {
-                showPopup(`❌ Error: ${error.message}`);
-            }
-        }
-
-        function copyToClipboard() {
-            const input = document.getElementById("playlist_url");
-            input.select();
-            try {
-                document.execCommand('copy');
-                showPopup("📋 URL copied to clipboard!");
-            } catch (err) {
-                showPopup("❌ Failed to copy");
-            }
-        }
-
-        function showPopup(message) {
-            const popup = document.getElementById("popup");
-            const popupMessage = document.getElementById("popupMessage");
-            const overlay = document.getElementById("overlay");
-            
-            popupMessage.textContent = message;
-            popup.style.display = "block";
-            overlay.style.display = "block";
-            
-            setTimeout(closePopup, 3000);
-        }
-
-        function closePopup() {
-            document.getElementById("popup").style.display = "none";
-            document.getElementById("overlay").style.display = "none";
-        }
-
-        window.onload = fetchCategoriesAndChannels;
-    </script>
-</body>
-</html>
+                categoryList.appendChild(for
