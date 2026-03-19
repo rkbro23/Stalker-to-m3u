@@ -1,7 +1,7 @@
 <?php
 $stalkerCredentials = [
-    'host' => 'main.light-ott.net',
-    'mac'  => '00:1A:79:66:94:44',
+    'host' => 'pro.true8k.xyz:80',
+    'mac'  => '00:1A:79:4D:9A:C3',
     'api_file' => 'server/load.php'  // Direct API path
 ];
 
