@@ -52,7 +52,8 @@ function handshake($host, $mac, $debug = false) {
         'random' => $random
     ]);
 
-    $url    = "    $url    = "http://{$host}{$base_path}/{$stalkerCredentials['api_file']}";
+    $url = "http://{$host}{$base_path}/{$stalkerCredentials['api_file']}";
+    
     ";
     $params = [
         'type'        => 'stb',
