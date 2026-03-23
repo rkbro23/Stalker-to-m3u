@@ -12,7 +12,7 @@ function generateDeviceHashes($mac) {
     $sn_full   = strtoupper(substr(md5($mac_clean), 0, 13));
     return [
         'sn'        => $sn_full,
-        'sn_cut'    => $sn_full,   // alias - dono same hain
+        'sn_cut'    => $sn_full,
         'dev_id'    => strtoupper(hash('sha256', $mac_clean)),
         'dev_id2'   => strtoupper(hash('sha256', $mac_clean . 'mag250')),
         'signature' => strtoupper(hash('sha256', $mac_clean . 'signature'))
@@ -54,7 +54,6 @@ function handshake($host, $mac, $debug = false) {
 
     $url = "http://{$host}{$base_path}/{$stalkerCredentials['api_file']}";
     
-    ";
     $params = [
         'type'        => 'stb',
         'action'      => 'handshake',
@@ -113,12 +112,11 @@ function generate_token($force_refresh = false) {
 
 function stalkerRequest($type, $action, $extra = []) {
     global $stalkerCredentials;
-
     $mac    = $stalkerCredentials['mac'];
     $host   = $stalkerCredentials['host'];
     $hashes = generateDeviceHashes($mac);
     $token  = generate_token();
-
+    
     if (!$token) {
         error_log("No token available for $type/$action");
         return [];
@@ -135,7 +133,7 @@ function stalkerRequest($type, $action, $extra = []) {
         'device_id2'   => $hashes['dev_id2'],
         'signature'    => $hashes['signature']
     ], $extra);
-
+    
     $fullUrl = $url . '?' . http_build_query($params);
 
     $ch = curl_init();
@@ -150,7 +148,7 @@ function stalkerRequest($type, $action, $extra = []) {
     ]);
 
     $response = curl_exec($ch);
-
+    
     if (curl_errno($ch)) {
         error_log("CURL ERROR in $type/$action: " . curl_error($ch));
         curl_close($ch);
