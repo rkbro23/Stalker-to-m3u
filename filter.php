@@ -514,7 +514,7 @@ if (function_exists('generateDeviceHashes')) {
 
             try {
                 // Fetch categories first
-                const baseURL = `http://${stalkerCredentials.host}/stalker_portal/server/load.php`;
+                const baseURL = `http://${stalkerCredentials.host}/portal.php`;
                 
                 const categoryRes = await fetch(`feeder.php?url=${encodeURIComponent(baseURL + '?type=itv&action=get_genres&JsHttpRequest=1-xml')}`);
                 
