@@ -89,15 +89,12 @@ echo "#EXTM3U\n";
 $streamCount = 0;
 
 foreach ($channels as $channel) {
-    // Channel ID nikalo
-    $cmd = $channel['cmd'] ?? '';
-    $id  = '';
-    if (preg_match('/ch\/(\d+)/', $cmd, $m)) {
-        $id = $m[1];
-    } elseif (preg_match('/\/(\d+)(\.ts|\?|$)/', $cmd, $m)) {
-        $id = $m[1];
+    // Channel ID direct extract karo (Stalker id field deta hai)
+    $id = $channel['id'] ?? '';
+    if (empty($id)) {
+        continue;
     }
-    if (empty($id)) continue;
+    
 
     $name  = $channel['name']        ?? 'Unknown Channel';
     $catId = $channel['tv_genre_id'] ?? '';
