@@ -2,7 +2,7 @@
 $stalkerCredentials = [
     'host'      => 'pro.true8k.xyz:80',
     'mac'       => '00:1A:79:4D:9A:C3',
-    'base_path' => '/c/',
+    'base_path' => '/c',
     'api_file'  => 'portal.php',
     'stb_type'  => 'MAG250'
 ];
